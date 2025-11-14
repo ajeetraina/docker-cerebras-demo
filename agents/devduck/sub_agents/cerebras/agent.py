@@ -7,7 +7,8 @@ from .tools import create_mcp_toolsets
 
 
 class CerebrasCompatibleLiteLlm(LiteLlm):
-    """LiteLLM wrapper that filters out Cerebras-unsupported JSON schema fields."""
+    """LiteLLM wrapper that filters out Cerebras-unsupported JSON schema fields
+    and ensures proper function calling behavior."""
     
     def _filter_json_schema(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Recursively remove unsupported JSON schema fields."""
@@ -30,8 +31,9 @@ class CerebrasCompatibleLiteLlm(LiteLlm):
         return filtered
     
     async def acompletion(self, *args, **kwargs):
-        """Override acompletion to filter tool schemas."""
+        """Override acompletion to filter tool schemas and configure for Cerebras."""
         if 'tools' in kwargs and kwargs['tools']:
+            # Filter unsupported schema fields
             filtered_tools = []
             for tool in kwargs['tools']:
                 if isinstance(tool, dict) and 'function' in tool:
@@ -45,7 +47,15 @@ class CerebrasCompatibleLiteLlm(LiteLlm):
                     filtered_tools.append(tool)
             kwargs['tools'] = filtered_tools
             
+            # Force auto tool choice for Cerebras - CRITICAL for function calling
+            if 'tool_choice' not in kwargs:
+                kwargs['tool_choice'] = 'auto'
+            
+            # Disable parallel tool calls - Cerebras doesn't support this yet
+            kwargs['parallel_tool_calls'] = False
+            
         return await super().acompletion(*args, **kwargs)
+
 
 tools = create_mcp_toolsets()
 
