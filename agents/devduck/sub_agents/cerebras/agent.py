@@ -30,8 +30,9 @@ class CerebrasCompatibleLiteLlm(LiteLlm):
         return filtered
     
     async def acompletion(self, *args, **kwargs):
-        """Override acompletion to filter tool schemas."""
+        """Override acompletion to filter tool schemas and force proper tool calling."""
         if 'tools' in kwargs and kwargs['tools']:
+            # Filter unsupported schema fields
             filtered_tools = []
             for tool in kwargs['tools']:
                 if isinstance(tool, dict) and 'function' in tool:
@@ -45,7 +46,15 @@ class CerebrasCompatibleLiteLlm(LiteLlm):
                     filtered_tools.append(tool)
             kwargs['tools'] = filtered_tools
             
+            # Force auto tool choice for Cerebras
+            if 'tool_choice' not in kwargs:
+                kwargs['tool_choice'] = 'auto'
+            
+            # Disable parallel tool calls (Cerebras may not support it)
+            kwargs['parallel_tool_calls'] = False
+            
         return await super().acompletion(*args, **kwargs)
+
 
 tools = create_mcp_toolsets()
 
